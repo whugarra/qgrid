@@ -8,12 +8,9 @@ define([
 ], function ($, _, moment, date_filter, slider_filter, text_filter) {
   "use strict";
 
-  var dependencies_loaded = false;
-  var grids_to_initialize = []
-
   var QGrid = function (grid_elem_selector, data_frame, column_types) {
     this.grid_elem_selector = grid_elem_selector;
-    this.grid_elem = $(this.grid_elem_selector)
+    this.grid_elem = $(this.grid_elem_selector);
     this.data_frame = data_frame;
 
     this.row_data = [];
@@ -61,7 +58,10 @@ define([
         var filter_generator = this["create_" + cur_column.type + "_filter"];
         if (filter_generator){
           var cur_filter = filter_generator(cur_column.field);
-          $(cur_filter).on("filter_changed", $.proxy(this.handle_filter_changed, this))
+          $(cur_filter).on(
+            "filter_changed",
+            $.proxy(this.handle_filter_changed, this)
+          );
           this.filters[cur_column.id] = cur_filter;
           this.filter_list.push(cur_filter);
         }
@@ -71,15 +71,15 @@ define([
     }
 
     var row_count = 0;
-    _.each(this.data_frame, function (cur_row, key, list) {
+    _.each(this.data_frame, function (cur_row){
       cur_row.id = "row" + row_count;
       row_count++;
-      this.row_data.push(cur_row);
-      this.filter_list.forEach(function(cur_filter){
+      self.row_data.push(cur_row);
+      self.filter_list.forEach(function(cur_filter){
         cur_filter.handle_row_data(cur_row);
-      }, this);
-    }, this);
-  }
+      }, self);
+    }, self);
+  };
 
   QGrid.prototype.initialize_slick_grid = function () {
     this.data_view = new Slick.Data.DataView({
