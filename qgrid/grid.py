@@ -4,10 +4,16 @@ import os
 import uuid
 import json
 from numbers import Integral
-from types import DictType
 
 from IPython.display import display_html, display_javascript
-
+from IPython.html.widgets import DOMWidget
+from IPython.utils.traitlets import (
+    CInt,
+    List,
+    Any,
+    Unicode,
+    Dict,
+)
 
 def template_contents(filename):
     template_filepath = os.path.join(
@@ -80,6 +86,37 @@ defaults = _DefaultSettings()
 set_defaults = defaults.set_defaults
 set_js_option = defaults.set_js_option
 
+def load_js():
+    return Loader()
+
+class Loader(object):
+
+    def __init__(self, remote_js=False):
+        self.remote_js = remote_js
+        self.div_id = str(uuid.uuid4())
+
+    def _ipython_display_(self):
+        try:
+            if self.remote_js:
+                cdn_base_url = \
+                    "https://cdn.rawgit.com/quantopian/qgrid/ddf33c0efb813cd574f3838f6cf1fd584b733621/qgrid/qgridjs/"
+            else:
+                cdn_base_url = "/nbextensions/qgridjs"
+
+            raw_html = SLICK_GRID_CSS.format(
+                div_id=self.div_id,
+                cdn_base_url=cdn_base_url,
+                )
+            raw_js = SLICK_GRID_JS.format(
+                cdn_base_url=cdn_base_url,
+                div_id=self.div_id,
+                )
+
+            display_html(raw_html, raw=True)
+            display_javascript(raw_js, raw=True)
+        except Exception as err:
+            display_html('ERROR: {}'.format(str(err)), raw=True)
+
 
 def show_grid(data_frame, remote_js=None, precision=None, js_options=None):
     """
@@ -126,27 +163,37 @@ def show_grid(data_frame, remote_js=None, precision=None, js_options=None):
             raise TypeError("precision must be int, not %s" % type(precision))
     if js_options is None:
         js_options = defaults.js_options
-        if not isinstance(js_options, DictType):
+        if not isinstance(js_options, dict):
             raise TypeError(
                 "js_options must be dict, not %s" % type(js_options)
             )
 
     return SlickGrid(
-        data_frame,
+        data_frame=data_frame,
         remote_js=remote_js,
         precision=precision,
         js_options=js_options,
     )
 
+class SlickGrid(DOMWidget):
 
-class SlickGrid(object):
+    _view_name = Unicode('QGrid', sync=True)
 
-    def __init__(self, data_frame, remote_js, precision, js_options):
-        self.data_frame = data_frame
-        self.remote_js = remote_js
-        self.div_id = str(uuid.uuid4())
+    column_types_json = Unicode("", help="Column configuration", sync=True)
+    options_json = Unicode("", help="Grid configuration", sync=True)
 
-        self.df_copy = data_frame.copy()
+    range_start = CInt(0, help="Row-range start", sync=True)
+    range_end = CInt(0, help="Row-range end", sync=True)
+
+    rows = List(Dict, help="""The rows in the grid.
+    """, sync=True)
+
+    def __init__(self, *args, **kwargs):
+
+        self.data_frame = kwargs.pop('data_frame')
+        self.remote_js = kwargs.pop('remote_js')
+
+        self.df_copy = self.data_frame.copy()
 
         if type(self.df_copy.index) == pd.core.index.MultiIndex:
             self.df_copy.reset_index(inplace=True)
@@ -167,38 +214,23 @@ class SlickGrid(object):
                     break
             self.column_types.append(column_type)
 
-        self.precision = precision
-        self.js_options = js_options
+        self.precision = kwargs.pop('precision', 2)
+        self.js_options = kwargs.pop('js_options', {})
 
-    def _ipython_display_(self):
+        self.column_types_json = json.dumps(self.column_types)
+        self.options_json = json.dumps(self.js_options)
+
+        DOMWidget.__init__(self, *args, **kwargs)
+
+    def _range_start_changed(self, name, old, new):
+        self._range_changed_helper(old, new)
+
+    def _range_end_changed(self, name, old, new):
+        self._range_changed_helper(old, new)
+
+    def _range_changed_helper(self, old, new):
+        self._in_range_changed = True
         try:
-            column_types_json = json.dumps(self.column_types)
-            data_frame_json = self.df_copy.to_json(
-                orient='records',
-                date_format='iso',
-                double_precision=self.precision,
-            )
-            options_json = json.dumps(self.js_options)
-
-            if self.remote_js:
-                cdn_base_url = \
-                    "https://cdn.rawgit.com/quantopian/qgrid/ddf33c0efb813cd574f3838f6cf1fd584b733621/qgrid/qgridjs/"
-            else:
-                cdn_base_url = "/nbextensions/qgridjs"
-
-            raw_html = SLICK_GRID_CSS.format(
-                div_id=self.div_id,
-                cdn_base_url=cdn_base_url,
-            )
-            raw_js = SLICK_GRID_JS.format(
-                cdn_base_url=cdn_base_url,
-                div_id=self.div_id,
-                data_frame_json=data_frame_json,
-                column_types_json=column_types_json,
-                options_json=options_json,
-            )
-
-            display_html(raw_html, raw=True)
-            display_javascript(raw_js, raw=True)
-        except Exception as err:
-            display_html('ERROR: {}'.format(str(err)), raw=True)
+            self.value_names = list(new.keys())
+        finally:
+            self._in_range_changed = False

@@ -1,7 +1,10 @@
 from .grid import (
+    defaults,
     set_defaults,
     set_js_option,
     show_grid,
+    load_js,
+    SlickGrid,
 )
 
 
@@ -26,4 +29,4 @@ def nbinstall(user=True, overwrite=False):
     )
 
 
-__all__ = ['show_grid', 'set_defaults', 'set_js_option']
+__all__ = ['show_grid', 'set_defaults', 'set_js_option', 'SlickGrid', 'load_js']

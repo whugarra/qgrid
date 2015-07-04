@@ -5,7 +5,7 @@ var path_dictionary = {{
     slick_check_box_column: "{cdn_base_url}/lib/slick.checkboxselectcolumn",
     slick_row_selection_model: "{cdn_base_url}/lib/slick.rowselectionmodel",
     slick_grid: "{cdn_base_url}/lib/slick.grid.2.2",
-    data_grid: "{cdn_base_url}/qgrid",
+    qgrid: "{cdn_base_url}/qgrid",
     date_filter: "{cdn_base_url}/qgrid.datefilter",
     slider_filter: "{cdn_base_url}/qgrid.sliderfilter",
     text_filter: "{cdn_base_url}/qgrid.textfilter",
@@ -43,13 +43,14 @@ require([
 function($){{
     $('#{div_id}').closest('.rendered_html').removeClass('rendered_html');
     require([
-      'slick_check_box_column',
-      'slick_row_selection_model',
-      'slick_grid'
-    ], function(){{
-        require(["data_grid"], function(dgrid){{
-            var grid = new dgrid.QGrid('#{div_id}', {data_frame_json}, {column_types_json});
-            grid.initialize_slick_grid({options_json});
+        'widgets/js/manager',
+        'slick_check_box_column',
+        'slick_row_selection_model',
+        'slick_grid',
+    ], function(manager){{
+        require(["qgrid"], function(qgrid){{
+            manager.WidgetManager.register_widget_view('QGrid', qgrid.QGrid);
+            console.log('qgrid registered');
         }});
     }});
 }});

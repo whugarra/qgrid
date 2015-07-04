@@ -8,6 +8,4 @@ if ($("#dg-css").length == 0){{
     ]);
 }}
 </script>
-<div class='q-grid-container'>
-<div id='{div_id}' class='q-grid'></div>
-</div>
+<div>qgrid loaded</div>
