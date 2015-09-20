@@ -305,7 +305,7 @@ class QGridWidget(widgets.DOMWidget):
         if 'type' not in content:
             return
         if content['type'] == 'remove_row':
-            self.df.drop(content['row'], inplace=True)
+            self.df.drop(self.df.index[content['row']], inplace=True)
 
         elif content['type'] == 'cell_change':
             try:
