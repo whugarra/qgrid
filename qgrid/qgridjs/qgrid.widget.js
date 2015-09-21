@@ -32,6 +32,7 @@ define([path + "widgets/js/widget", path + "widgets/js/manager"], function(widge
                 data_grid: cdn_base_url + "/qgrid",
                 date_filter: cdn_base_url + "/qgrid.datefilter",
                 text_filter: cdn_base_url + "/qgrid.textfilter",
+                remote_model: cdn_base_url + "/qgrid.remotemodel",
                 slider_filter: cdn_base_url + "/qgrid.sliderfilter",
                 filter_base:  cdn_base_url + "/qgrid.filterbase",
                 editors: cdn_base_url + "/qgrid.editors",
@@ -100,10 +101,10 @@ define([path + "widgets/js/widget", path + "widgets/js/manager"], function(widge
             this.el.setAttribute("style", "max-width:" + String(width) + "px;");
 
             // create the table
-            var df = JSON.parse(this.model.get('_df_json'));
+            // var df = JSON.parse(this.model.get('_df_json'));
             var column_types = JSON.parse(this.model.get('_column_types_json'));
             var options = JSON.parse(this.model.get('grid_options'));
-            grid = new dgrid.QGrid(table[0], df, column_types);
+            grid = new dgrid.QGrid(table[0], this.model, column_types);
             grid.initialize_slick_grid(options);
 
             // set up editing

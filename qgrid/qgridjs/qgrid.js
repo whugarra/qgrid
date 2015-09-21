@@ -4,17 +4,19 @@ define([
     'moment',
     'date_filter',
     'slider_filter',
-    'text_filter'
-], function ($, _, moment, date_filter, slider_filter, text_filter) {
+    'text_filter',
+    'remote_model'
+], function ($, _, moment, date_filter, slider_filter,
+  text_filter, remote_model) {
   "use strict";
 
   var dependencies_loaded = false;
   var grids_to_initialize = []
 
-  var QGrid = function (grid_elem_selector, data_frame, column_types) {
+  var QGrid = function (grid_elem_selector, model, column_types) {
     this.grid_elem_selector = grid_elem_selector;
     this.grid_elem = $(this.grid_elem_selector)
-    this.data_frame = data_frame;
+    this.model = model;
 
     this.row_data = [];
     this.columns = [];
@@ -70,35 +72,38 @@ define([
       }
     }
 
-    var row_count = 0;
-    _.each(this.data_frame, function (cur_row, key, list) {
-      cur_row.id = "row" + row_count;
-      row_count++;
-      this.row_data.push(cur_row);
-      this.filter_list.forEach(function(cur_filter){
-        cur_filter.handle_row_data(cur_row);
-      }, this);
-    }, this);
+//    var row_count = 0;
+//    _.each(this.data_frame, function (cur_row, key, list) {
+//      cur_row.id = "row" + row_count;
+//      row_count++;
+//      this.row_data.push(cur_row);
+//      this.filter_list.forEach(function(cur_filter){
+//        cur_filter.handle_row_data(cur_row);
+//      }, this);
+//    }, this);
   }
 
   QGrid.prototype.initialize_slick_grid = function (options) {
-    this.data_view = new Slick.Data.DataView({
-      inlineFilters: false,
-      enableTextSelectionOnCells: true
-    })
 
-    this.data_view.beginUpdate();
-    var sort_comparer = this.get_sort_comparer(this.sort_field, this.sort_ascending)
-    this.data_view.sort(sort_comparer, this.sort_ascending);
-    this.data_view.setItems(this.row_data);
-    this.data_view.setFilter($.proxy(this.include_row, this));
-    this.data_view.endUpdate();
+    this.remote_model = new remote_model.RemoteModel(this.model);
+
+//    this.data_view = new Slick.Data.DataView({
+//      inlineFilters: false,
+//      enableTextSelectionOnCells: true
+//    })
+
+//    this.data_view.beginUpdate();
+//    var sort_comparer = this.get_sort_comparer(this.sort_field, this.sort_ascending)
+//    this.data_view.sort(sort_comparer, this.sort_ascending);
+//    this.data_view.setItems(this.row_data);
+//    this.data_view.setFilter($.proxy(this.include_row, this));
+//    this.data_view.endUpdate();
 
     var max_height = options.rowHeight * 15;
     var grid_height = max_height;
     // totalRowHeight is how tall the grid would have to be to fit all of the rows in the dataframe.
     // The '+ 1' accounts for the height of the column header.
-    var total_row_height = (this.row_data.length + 1) * options.rowHeight + 1;
+    var total_row_height = (100 + 1) * options.rowHeight + 1;
     if (total_row_height <= max_height){
       grid_height = total_row_height;
       this.grid_elem.addClass('hide-scrollbar');
@@ -109,9 +114,50 @@ define([
       this.grid_elem.width(this.columns.length * 200);
     }
 
-    this.slick_grid = new Slick.Grid(this.grid_elem_selector, this.data_view, this.columns, options);
+    this.slick_grid = new Slick.Grid(this.grid_elem_selector,
+      this.remote_model.data_view, this.columns, options);
     this.slick_grid.setSelectionModel(new Slick.RowSelectionModel())
     this.update_sort_indicators();
+
+    var self = this;
+    this.slick_grid.onViewportChanged.subscribe(function (e, args) {
+      var vp = self.slick_grid.getViewport();
+      self.remote_model.ensureData(vp.top, vp.bottom);
+    });
+
+//    this.slick_grid.onSort.subscribe(function (e, args) {
+//      loader.setSort(args.sortCol.field, args.sortAsc ? 1 : -1);
+//      var vp = this.slick_grid.getViewport();
+//      this.remote_model.ensureData(vp.top, vp.bottom);
+//    });
+
+    var loadingIndicator = null;
+    this.remote_model.onDataLoading.subscribe(function () {
+      if (!loadingIndicator) {
+        loadingIndicator = $("<span class='loading-indicator'><label>Buffering...</label></span>").appendTo(document.body);
+        var $g = self.grid_elem;
+
+        loadingIndicator
+            .css("position", "absolute")
+            .css("top", $g.position().top + $g.height() / 2 - loadingIndicator.height() / 2)
+            .css("left", $g.position().left + $g.width() / 2 - loadingIndicator.width() / 2);
+      }
+
+      loadingIndicator.show();
+    });
+
+    this.remote_model.onDataLoaded.subscribe(function (e, args) {
+      for (var i = args.from; i <= args.to; i++) {
+        self.slick_grid.invalidateRow(i);
+      }
+
+      self.slick_grid.updateRowCount();
+      self.slick_grid.render();
+
+      loadingIndicator.fadeOut();
+    });
+
+
     this.slick_grid.render();
 
     this.slick_grid.onSort.subscribe($.proxy(this.handle_sort_changed, this));
@@ -121,12 +167,12 @@ define([
     this.slick_grid.setColumns(this.slick_grid.getColumns());
 
     var self = this;
-    this.data_view.onRowCountChanged.subscribe(function(e, args){
+    this.remote_model.data_view.onRowCountChanged.subscribe(function(e, args){
       self.slick_grid.updateRowCount();
       self.slick_grid.render();
     });
 
-    this.data_view.onRowsChanged.subscribe(function(e, args){
+    this.remote_model.data_view.onRowsChanged.subscribe(function(e, args){
       self.slick_grid.invalidateRows(args.rows)
       self.slick_grid.render()
     });
@@ -134,6 +180,8 @@ define([
     $(window).resize(function(){
       self.slick_grid.resizeCanvas();
     });
+
+    this.slick_grid.onViewportChanged.notify();
   }
 
   QGrid.prototype.handle_filter_changed = function(e, exclude_this_filter){
@@ -166,7 +214,7 @@ define([
         cur_filter.reset_min_max();
       }
     }
-    this.data_view.refresh();
+//    this.data_view.refresh();
     for (var i=0; i < this.filter_list.length; i++){
       var cur_filter = this.filter_list[i];
       if ((cur_filter instanceof slider_filter.SliderFilter) && cur_filter != excluded_filter){
@@ -201,7 +249,7 @@ define([
     this.sort_ascending = args.sortAsc;
 
     var sort_comparer = this.get_sort_comparer(this.sort_field, this.sort_ascending);
-    this.data_view.sort(sort_comparer, this.sort_ascending);
+//    this.data_view.sort(sort_comparer, this.sort_ascending);
   }
 
   QGrid.prototype.update_sort_indicators = function(){

@@ -204,11 +204,15 @@ def show_grid(data_frame, remote_js=None, precision=None, grid_options=None,
 class QGridWidget(widgets.DOMWidget):
     _view_module = Unicode("nbextensions/qgridjs/qgrid.widget", sync=True)
     _view_name = Unicode('QGridView', sync=True)
-    _df_json = Unicode('', sync=True)
+
     _column_types_json = Unicode('', sync=True)
     _index_name = Unicode('')
     _cdn_base_url = Unicode("/nbextensions/qgridjs", sync=True)
     _multi_index = Bool(False)
+
+    range_start = Integer(0, help="Row-range start", sync=True)
+    range_end = Integer(100, help="Row-range end", sync=True)
+    _df_json = Unicode('', sync=True)
 
     df = Instance(pd.DataFrame)
     precision = Integer()
@@ -266,6 +270,27 @@ class QGridWidget(widgets.DOMWidget):
             )
 
         self._remote_js_changed()
+
+    def _range_start_changed(self, name, old, new):
+        self._range_changed_helper(old, new)
+
+    def _range_end_changed(self, name, old, new):
+        self._range_changed_helper(old, new)
+
+    def _range_changed_helper(self, old, new):
+        import pdb; pdb.set_trace()
+        self._in_range_changed = True
+        try:
+            self.df_copy = self.data_frame.copy()
+            self.range_end = min(self.range_end, len(self.df_copy))
+            requested_rows = self.df_copy.iloc[self.range_start:self.range_end]
+            self._df_json = requested_rows.to_json(
+                orient='records',
+                date_format='iso',
+                double_precision=self.precision,
+            )
+        finally:
+            self._in_range_changed = False
 
     def _remote_js_changed(self):
         if self.remote_js:
