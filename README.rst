@@ -196,7 +196,7 @@ to do this.
 
 #. Clone the repository from GitHub and ``cd`` into the top-level directory::
 
-    git clone https://github.com/quantopian/qgrid.git
+    git clone https://github.com/whugarra/qgrid.git
     cd qgrid
 
 #. Install the current project in `editable <https://pip.pypa.io/en/stable/reference/pip_install/#editable-installs>`_
